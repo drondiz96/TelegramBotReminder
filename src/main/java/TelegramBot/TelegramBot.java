@@ -10,11 +10,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 import java.text.ParseException;
@@ -73,7 +69,7 @@ public class TelegramBot extends TelegramLongPollingBot{
                         execute(SendMessage
                                 .builder()
                                 .chatId(update.getMessage().getChatId().toString())
-                                .text("Добро пожаловать в телеграмм бот!")
+                                .text("Добро пожаловать в телеграмм бот!\n↓ меню")
                                 .build());
 
                     } catch (TelegramApiException e) {
@@ -82,6 +78,11 @@ public class TelegramBot extends TelegramLongPollingBot{
                 }
                 else if(condition.write_text){
                     try {
+                        try {
+                            execute(new DeleteMessage(update.getMessage().getChatId().toString(), IdLastMessage));
+                        } catch (TelegramApiException e) {
+                            throw new RuntimeException(e);
+                        }
                         IdLastMessage = execute(SendMessage
                                 .builder()
                                 .chatId(update.getMessage().getChatId().toString())
@@ -96,23 +97,32 @@ public class TelegramBot extends TelegramLongPollingBot{
                 }
                 else if(condition.write_date){
                     try {
+                        try {
+                            execute(new DeleteMessage(update.getMessage().getChatId().toString(), IdLastMessage));
+                        } catch (TelegramApiException e) {
+                            throw new RuntimeException(e);
+                        }
+                        SetDateReminder(answer);
+
+                        condition.write_text = true;
+                        condition.write_date = false;
+
                         IdLastMessage = execute(SendMessage
                                 .builder()
                                 .chatId(update.getMessage().getChatId().toString())
                                 .replyMarkup(cansel())
                                 .text("Пожалуйста, введите текст.")
                                 .build()).getMessageId();
-
-                        SetDateReminder(answer);
-                        condition.write_text = true;
-                        condition.write_date = false;
                     } catch (ParseException e) {
                         try {
+                            try {
+                                execute(new DeleteMessage(update.getMessage().getChatId().toString(), IdLastMessage));
+                            } catch (TelegramApiException E) {}
                             IdLastMessage = execute(SendMessage
                                     .builder()
                                     .chatId(update.getMessage().getChatId().toString())
                                     .replyMarkup(cansel())
-                                    .text("Пожалуйста, введите Время в формате \"dd.MM.yyyy HH.mm\" (пример 31.12.2023 22.30)")
+                                    .text("Пожалуйста, введите время в формате \"dd.MM.yyyy HH:mm\" (пример 01.01.2023 00:00)")
                                     .build()).getMessageId();
                             condition.write_date = true;
                             condition.write_text = false;
@@ -129,7 +139,7 @@ public class TelegramBot extends TelegramLongPollingBot{
                                 .builder()
                                 .chatId(update.getMessage().getChatId().toString())
                                 .replyMarkup(cansel())
-                                .text("Пожалуйста, введите Время в формате \"dd.MM.yyyy HH.mm\" (пример 31.12.2023 22.30)")
+                                .text("Пожалуйста, введите время в формате \"dd.MM.yyyy HH:mm\" (пример 01.01.2023 00:00)")
                                 .build()).getMessageId();
                         condition.write_date = true;
                     } catch (TelegramApiException e) {
@@ -150,18 +160,18 @@ public class TelegramBot extends TelegramLongPollingBot{
             }
         }
         else if (update.hasCallbackQuery()) {
+            String chatId = update.getCallbackQuery().getMessage().getChatId().toString();
             if(update.getCallbackQuery().getData().toString().equals("Настройка закончена.")) {
-                DeleteMessage deleteMessage = new DeleteMessage(update.getCallbackQuery().getMessage().getChatId().toString(), IdLastMessage);
                 try {
-                    execute(deleteMessage);
+                    execute(new DeleteMessage(chatId, IdLastMessage));
                 } catch (TelegramApiException e) {
                     throw new RuntimeException(e);
                 }
-                EndSetting(true ,update.getCallbackQuery().getMessage().getChatId().toString());
+                EndSetting(true ,chatId);
                 try {
                     execute(SendMessage
                             .builder()
-                            .chatId(update.getCallbackQuery().getMessage().getChatId().toString())
+                            .chatId(chatId)
                             .text("Настройка напоминалки закончена.")
                             .build());
                 } catch (TelegramApiException e) {
@@ -170,18 +180,17 @@ public class TelegramBot extends TelegramLongPollingBot{
             }
             else
             if(update.getCallbackQuery().getData().toString().equals("Отмена")) {
-                DeleteMessage deleteMessage = new DeleteMessage(update.getCallbackQuery().getMessage().getChatId().toString(), IdLastMessage);
                 try {
-                    execute(deleteMessage);
+                    execute(new DeleteMessage(chatId, IdLastMessage));
                 } catch (TelegramApiException e) {
                     throw new RuntimeException(e);
                 }
 
-                EndSetting(false ,update.getCallbackQuery().getMessage().getChatId().toString());
+                EndSetting(false, chatId);
                 try {
                     execute(SendMessage
                             .builder()
-                            .chatId(update.getCallbackQuery().getMessage().getChatId().toString())
+                            .chatId(chatId)
                             .text("Настройка напоминалки отменена.")
                             .build());
                 } catch (TelegramApiException e) {
@@ -190,6 +199,7 @@ public class TelegramBot extends TelegramLongPollingBot{
             }
         }
     }
+
     public static InlineKeyboardMarkup sendInlineKeyBoardMessage() {
         InlineKeyboardButton inlineKeyboardButton1 = new InlineKeyboardButton("Конец настройки.");
         inlineKeyboardButton1.setCallbackData("Настройка закончена.");
@@ -272,15 +282,14 @@ public class TelegramBot extends TelegramLongPollingBot{
         reminder.setText(text);
     }
     public void SetDateReminder(String time) throws ParseException {
-        reminder.setDate(new SimpleDateFormat("dd.MM.yyyy HH.mm").parse(time));
+        reminder.setDate(new SimpleDateFormat("dd.MM.yyyy HH:mm").parse(time));
     }
     public void EndSetting(Boolean bool,String chatId) {
-        if(bool)
-        {
+        if(bool) {
             reminder.setChatId(chatId);
             Timer timer = new Timer();
-            Reminder tmp = new Reminder(new Data(reminder.getChatId(), reminder.getText()), timer);
-            reminderStream = Stream.concat(reminderStream, Stream.of(tmp));
+            //Reminder tmp = new Reminder(new Data(reminder.getChatId(), reminder.getText()), timer);
+            //reminderStream = Stream.concat(reminderStream, Stream.of(tmp));
             timer.schedule(new Scheduling(), reminder.getDate());
         }
         condition.write_date = false;
